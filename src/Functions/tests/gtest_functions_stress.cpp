@@ -265,7 +265,11 @@ const std::unordered_set<std::string_view> excluded_functions = {
     /// Avoid depending on environment (e.g. current query, configuration, settings).
     "synonyms",
     "catboostEvaluate",
+    "aiClassify",
+    "aiExtract",
     "aiGenerateContent",
+    "aiGenerateSQL",
+    "aiTranslate",
     "naiveBayesClassifier",
     "transactionLatestSnapshot",
     "transactionOldestSnapshot",

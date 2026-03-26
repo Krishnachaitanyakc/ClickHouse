@@ -3,8 +3,12 @@
 
 -- =============================================================================
 -- AI Functions Test Suite
--- Tests argument validation, error handling, and return types for
--- aiGenerateContent. All tests run without a real AI provider or API key.
+-- Tests argument validation, error handling, and return types for all 6 AI
+-- functions. All tests run without a real AI provider or API key.
+--
+-- Covered functions:
+--   aiClassify, aiExtract, aiTranslate, aiGenerateSQL,
+--   aiGenerateContent, aiGenerateEmbedding, aiGenerateEmbeddingOrNull
 -- =============================================================================
 
 SET allow_experimental_ai_functions = 1;
@@ -15,10 +19,65 @@ SET default_ai_provider = '';
 -- =============================================================================
 
 SELECT '-- Function registration';
-SELECT name FROM system.functions WHERE name IN ('aiGenerateContent') ORDER BY name;
+SELECT name FROM system.functions WHERE name IN ('aiClassify', 'aiExtract', 'aiGenerateContent', 'aiGenerateSQL', 'aiTranslate') ORDER BY name;
 
 -- =============================================================================
--- 2. aiGenerateContent: argument validation (expects 1-4 args)
+-- 2. aiClassify: argument validation (expects 2-4 args)
+-- =============================================================================
+
+SELECT '-- aiClassify: too few arguments';
+SELECT aiClassify(); -- { serverError NUMBER_OF_ARGUMENTS_DOESNT_MATCH }
+SELECT aiClassify('text'); -- { serverError NUMBER_OF_ARGUMENTS_DOESNT_MATCH }
+
+SELECT '-- aiClassify: too many arguments';
+SELECT aiClassify('a', ['b'], 0.5, 'x', 'y'); -- { serverError NUMBER_OF_ARGUMENTS_DOESNT_MATCH }
+
+SELECT '-- aiClassify: missing named collection';
+SELECT aiClassify('some text', ['positive', 'negative']); -- { serverError BAD_ARGUMENTS }
+
+-- =============================================================================
+-- 3. aiExtract: argument validation (expects 2-4 args)
+-- =============================================================================
+
+SELECT '-- aiExtract: too few arguments';
+SELECT aiExtract(); -- { serverError NUMBER_OF_ARGUMENTS_DOESNT_MATCH }
+SELECT aiExtract('text'); -- { serverError NUMBER_OF_ARGUMENTS_DOESNT_MATCH }
+
+SELECT '-- aiExtract: too many arguments';
+SELECT aiExtract('a', 'b', 0.5, 'x', 'y'); -- { serverError NUMBER_OF_ARGUMENTS_DOESNT_MATCH }
+
+SELECT '-- aiExtract: missing named collection';
+SELECT aiExtract('text', 'extract the name'); -- { serverError BAD_ARGUMENTS }
+
+-- =============================================================================
+-- 4. aiTranslate: argument validation (expects 2-5 args)
+-- =============================================================================
+
+SELECT '-- aiTranslate: too few arguments';
+SELECT aiTranslate(); -- { serverError NUMBER_OF_ARGUMENTS_DOESNT_MATCH }
+SELECT aiTranslate('text'); -- { serverError NUMBER_OF_ARGUMENTS_DOESNT_MATCH }
+
+SELECT '-- aiTranslate: too many arguments';
+SELECT aiTranslate('a', 'b', 'c', 'd', 'e', 'f'); -- { serverError NUMBER_OF_ARGUMENTS_DOESNT_MATCH }
+
+SELECT '-- aiTranslate: missing named collection';
+SELECT aiTranslate('hello world', 'French'); -- { serverError BAD_ARGUMENTS }
+
+-- =============================================================================
+-- 5. aiGenerateSQL: argument validation (expects 1-5 args)
+-- =============================================================================
+
+SELECT '-- aiGenerateSQL: too few arguments';
+SELECT aiGenerateSQL(); -- { serverError NUMBER_OF_ARGUMENTS_DOESNT_MATCH }
+
+SELECT '-- aiGenerateSQL: too many arguments';
+SELECT aiGenerateSQL('a', 'b', 'c', 'd', 'e', 'f'); -- { serverError NUMBER_OF_ARGUMENTS_DOESNT_MATCH }
+
+SELECT '-- aiGenerateSQL: missing named collection';
+SELECT aiGenerateSQL('top 10 users by revenue'); -- { serverError BAD_ARGUMENTS }
+
+-- =============================================================================
+-- 6. aiGenerateContent: argument validation (expects 1-4 args)
 -- =============================================================================
 
 SELECT '-- aiGenerateContent: too few arguments';
@@ -31,7 +90,7 @@ SELECT '-- aiGenerateContent: missing named collection';
 SELECT aiGenerateContent('hello world'); -- { serverError BAD_ARGUMENTS }
 
 -- =============================================================================
--- 3. Return type verification
+-- 7. Return type verification
 -- Uses column references (not constants) so the optimizer cannot fold the
 -- function call at analysis time. WHERE 0 prevents actual execution and HTTP.
 -- =============================================================================
@@ -44,6 +103,42 @@ CREATE NAMED COLLECTION ai_credentials AS
     api_key = 'fake-key-for-testing';
 
 SET default_ai_provider = 'ai_credentials';
+
+-- aiClassify returns Nullable(String)
+DROP TABLE IF EXISTS _03300_ret_classify;
+CREATE TABLE _03300_ret_classify ENGINE = Memory AS
+    SELECT aiClassify(x, ['a', 'b']) AS result FROM (SELECT 'text' AS x WHERE 0);
+SELECT '-- aiClassify return type';
+SELECT name, type FROM system.columns
+    WHERE database = currentDatabase() AND table = '_03300_ret_classify';
+DROP TABLE IF EXISTS _03300_ret_classify;
+
+-- aiExtract returns Nullable(String)
+DROP TABLE IF EXISTS _03300_ret_extract;
+CREATE TABLE _03300_ret_extract ENGINE = Memory AS
+    SELECT aiExtract(x, 'instruction') AS result FROM (SELECT 'text' AS x WHERE 0);
+SELECT '-- aiExtract return type';
+SELECT name, type FROM system.columns
+    WHERE database = currentDatabase() AND table = '_03300_ret_extract';
+DROP TABLE IF EXISTS _03300_ret_extract;
+
+-- aiTranslate returns Nullable(String)
+DROP TABLE IF EXISTS _03300_ret_translate;
+CREATE TABLE _03300_ret_translate ENGINE = Memory AS
+    SELECT aiTranslate(x, 'French') AS result FROM (SELECT 'hello' AS x WHERE 0);
+SELECT '-- aiTranslate return type';
+SELECT name, type FROM system.columns
+    WHERE database = currentDatabase() AND table = '_03300_ret_translate';
+DROP TABLE IF EXISTS _03300_ret_translate;
+
+-- aiGenerateSQL returns Nullable(String)
+DROP TABLE IF EXISTS _03300_ret_sql;
+CREATE TABLE _03300_ret_sql ENGINE = Memory AS
+    SELECT aiGenerateSQL(x) AS result FROM (SELECT 'show tables' AS x WHERE 0);
+SELECT '-- aiGenerateSQL return type';
+SELECT name, type FROM system.columns
+    WHERE database = currentDatabase() AND table = '_03300_ret_sql';
+DROP TABLE IF EXISTS _03300_ret_sql;
 
 -- aiGenerateContent returns Nullable(String)
 DROP TABLE IF EXISTS _03300_ret_content;

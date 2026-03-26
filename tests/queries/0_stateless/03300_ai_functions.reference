@@ -1,7 +1,31 @@
 -- Function registration
+aiClassify
+aiExtract
 aiGenerateContent
+aiGenerateSQL
+aiTranslate
+-- aiClassify: too few arguments
+-- aiClassify: too many arguments
+-- aiClassify: missing named collection
+-- aiExtract: too few arguments
+-- aiExtract: too many arguments
+-- aiExtract: missing named collection
+-- aiTranslate: too few arguments
+-- aiTranslate: too many arguments
+-- aiTranslate: missing named collection
+-- aiGenerateSQL: too few arguments
+-- aiGenerateSQL: too many arguments
+-- aiGenerateSQL: missing named collection
 -- aiGenerateContent: too few arguments
 -- aiGenerateContent: too many arguments
 -- aiGenerateContent: missing named collection
+-- aiClassify return type
+result	Nullable(String)
+-- aiExtract return type
+result	Nullable(String)
+-- aiTranslate return type
+result	Nullable(String)
+-- aiGenerateSQL return type
+result	Nullable(String)
 -- aiGenerateContent return type
 result	Nullable(String)

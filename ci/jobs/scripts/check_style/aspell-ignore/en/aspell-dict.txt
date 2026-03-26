@@ -1,4 +1,4 @@
-personal_ws-1.1 en 3605
+personal_ws-1.1 en 3609
 AArch
 ABIs
 ACLs
@@ -1378,7 +1378,11 @@ aggregatingmergetree
 aggregatio
 aggretate
 aggthrow
+aiClassify
+aiExtract
 aiGenerateContent
+aiGenerateSQL
+aiTranslate
 aiochclient
 alloc
 allocatio

@@ -66,6 +66,201 @@ Any OpenAI-compatible API (e.g. vLLM, Ollama, LiteLLM) can be used by setting `p
 | [`ai_max_api_calls_per_query`](/operations/settings/settings#ai_max_api_calls_per_query) | UInt64 | `1000` | Maximum API calls per query. |
 | [`ai_on_quota_exceeded`](/operations/settings/settings#ai_on_quota_exceeded) | String | `'throw'` | Behavior when quota is exceeded: `'throw'` raises an exception, `'null'` returns NULL for remaining rows. |
 
+## aiClassify {#aiclassify}
+
+Classifies input text into one of the provided categories.
+
+**Syntax**
+
+```sql
+aiClassify([collection,] text, categories[, temperature])
+```
+
+**Arguments**
+
+- `collection`: Name of the named collection. [String](../data-types/string.md). Optional if [`default_ai_provider`](/operations/settings/settings#default_ai_provider) is set.
+- `text`: Text to classify. [String](../data-types/string.md).
+- `categories`: Array of category labels. [Array(String)](../data-types/array.md).
+- `temperature`: Sampling temperature. Default: `0.0`. [Float64](../data-types/float.md). Optional.
+
+**Returned value**
+
+- One of the category strings from the `categories` array. Type: [Nullable(String)](../data-types/nullable.md).
+
+**Example**
+
+```sql
+SELECT aiClassify('ai_credentials', 'I absolutely love ClickHouse!', ['positive', 'negative', 'neutral']) AS sentiment;
+```
+
+```response
+┌─sentiment─┐
+│ positive  │
+└───────────┘
+```
+
+Classify multiple rows:
+
+```sql
+SELECT
+    review,
+    aiClassify('ai_credentials', review, ['positive', 'negative', 'neutral']) AS sentiment
+FROM product_reviews
+LIMIT 10;
+```
+
+## aiExtract {#aiextract}
+
+Extracts information from text.
+
+**Syntax**
+
+```sql
+aiExtract([collection,] text, what_to_extract[, temperature])
+```
+
+**Arguments**
+
+- `collection`: Name of the named collection. [String](../data-types/string.md). Optional if [`default_ai_provider`](/operations/settings/settings#default_ai_provider) is set.
+- `text`: Input text to extract from. [String](../data-types/string.md).
+- `what_to_extract`: Description of what to extract, or a JSON template defining the output schema (e.g. `'{"company": "company name", "location": "city"}'`). [String](../data-types/string.md).
+- `temperature`: Sampling temperature. Default: `0.0`. [Float64](../data-types/float.md). Optional.
+
+**Returned value**
+
+- The extracted text. Type: [Nullable(String)](../data-types/nullable.md).
+
+**Example**
+
+```sql
+SELECT aiExtract('ai_credentials', 'John Doe works at Acme Corp since 2020.', 'company name') AS company;
+```
+
+```response
+┌─company───┐
+│ Acme Corp │
+└───────────┘
+```
+
+You can use a JSON as an extraction prompt to define the schema you want back.
+
+```sql
+SELECT
+    JSONExtractString(info, 'company') AS company,
+    JSONExtractString(info, 'location') AS location,
+    JSONExtractString(info, 'stack') AS stack,
+    JSONExtractString(info, 'contact') AS contact,
+    JSONExtractString(info, 'remote') AS remote
+FROM
+(
+    SELECT aiExtract(
+        'ai_credentials',
+        text,
+        '{"company": "company name", "location": "city and state or country", "stack": "main technologies, comma-separated", "contact": "email address or application URL if mentioned, or null", "remote": "yes, no, or hybrid"}'
+    ) AS info
+    FROM default.hackernews
+    WHERE parent IN (22665398, 16735011, 15601729)
+      AND type = 'comment'
+      AND text != ''
+      AND length(text) > 100
+    ORDER BY cityHash64(id) ASC
+    LIMIT 30
+    SETTINGS ai_max_rows_per_query = 35, ai_max_rps = 10
+)
+ORDER BY company ASC;
+```
+
+```response
+┌─company────────┬─location───────────┬─stack──────────────────────┬─contact─────────────────────────┬─remote─┐
+│ Airbnb         │ San Francisco, CA  │ Ruby, React, Java          │ https://careers.airbnb.com      │ hybrid │
+│ Datadog        │ New York, NY       │ Go, Python, Kafka          │ jobs@datadoghq.com              │ no     │
+│ Fly.io         │ Remote             │ Rust, Go, Elixir           │ https://fly.io/jobs             │ yes    │
+│ PlanetScale    │ Remote             │ Go, MySQL, Vitess          │ null                            │ yes    │
+│ Stripe         │ San Francisco, CA  │ Ruby, Scala, TypeScript    │ https://stripe.com/jobs         │ hybrid │
+└────────────────┴────────────────────┴────────────────────────────┴─────────────────────────────────┴────────┘
+```
+
+This works with any JSON schema, you can add or remove keys to control exactly what will be extracted.
+
+## aiTranslate {#aitranslate}
+
+Translates text into the specified target language.
+
+**Syntax**
+
+```sql
+aiTranslate([collection,] text, target_language[, instructions][, temperature])
+```
+
+**Arguments**
+
+- `collection`: Name of the named collection. [String](../data-types/string.md). Optional if [`default_ai_provider`](/operations/settings/settings#default_ai_provider) is set.
+- `text`: Text to translate. [String](../data-types/string.md).
+- `target_language`: Target language name (e.g. `'French'`, `'Japanese'`, `'Spanish'`). [String](../data-types/string.md).
+- `instructions`: Additional translation instructions (e.g. `'use formal tone'`). [String](../data-types/string.md). Optional.
+- `temperature`: Sampling temperature. Default: `0.3`. [Float64](../data-types/float.md). Optional.
+
+**Returned value**
+
+- The translated text. Type: [Nullable(String)](../data-types/nullable.md).
+
+**Example**
+
+```sql
+SELECT aiTranslate('ai_credentials', 'Hello, how are you?', 'French') AS translated;
+```
+
+```response
+┌─translated──────────────────┐
+│ Bonjour, comment allez-vous? │
+└─────────────────────────────┘
+```
+
+Translate a whole column:
+
+```sql
+SELECT
+    original_text,
+    aiTranslate('ai_credentials', original_text, 'German') AS german_text
+FROM articles
+LIMIT 5;
+```
+
+## aiGenerateSQL {#aigeneratesql}
+
+Generates a SQL query from a natural language description using AI. The function automatically discovers the database schema from the ClickHouse catalog, introspecting all accessible databases and tables to build context for AI.
+
+**Syntax**
+
+```sql
+aiGenerateSQL([collection,] prompt[, temperature])
+```
+
+**Arguments**
+
+- `collection`: Name of the named collection. [String](../data-types/string.md). Optional if [`default_ai_provider`](/operations/settings/settings#default_ai_provider) is set.
+- `prompt`: Natural language description of the desired query (e.g. `'Count users by country'`). [String](../data-types/string.md).
+- `temperature`: Sampling temperature. Default: `0.1`. [Float64](../data-types/float.md). Optional.
+
+**Returned value**
+
+- A SQL query string. Type: [Nullable(String)](../data-types/nullable.md).
+
+**Example**
+
+```sql
+SELECT aiGenerateSQL(
+    'ai_credentials',
+    'Find the top 5 customers by total order amount'
+) AS generated_sql;
+```
+
+```response
+┌─generated_sql──────────────────────────────────────────────────────────────────────────┐
+│ SELECT customer_id, sum(amount) AS total FROM orders GROUP BY customer_id ORDER BY total DESC LIMIT 5 │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
 ## aiGenerateContent {#aigeneratecontent}
 
 Generates free-form text content from a prompt.
