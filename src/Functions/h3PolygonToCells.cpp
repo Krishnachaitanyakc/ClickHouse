@@ -98,11 +98,13 @@ public:
             using TypeConverter = std::decay_t<decltype(type)>;
             using Converter = typename TypeConverter::Type;
 
+            // polygonToCells does not work for points and lines
             if constexpr (std::is_same_v<ColumnToPointsConverter<SphericalPoint>, Converter>)
                 throw Exception(ErrorCodes::ILLEGAL_TYPE_OF_ARGUMENT, "The second argument of function {} must not be Point", getName());
             if constexpr (std::is_same_v<ColumnToLineStringsConverter<SphericalPoint>, Converter>)
                 throw Exception(ErrorCodes::ILLEGAL_TYPE_OF_ARGUMENT, "The second argument of function {} must not be LineString", getName());
 
+            // All geometries will be of same kind
             auto geometries = Converter::convert(col_array->getPtr());
 
             /// Reuse buffer across rows to avoid repeated allocations
@@ -186,26 +188,32 @@ private:
     class GeoPolygonContainer
     {
     private:
+        // Store the polygon data
         std::vector<LatLng> mainLoopVerts;
         std::vector<std::vector<LatLng>> holeVerts;
 
+        // Temporary storage for C-style structs
         mutable GeoLoop mutableMainLoop;
         mutable GeoPolygon mutablePolygon;
         mutable std::vector<GeoLoop> mutableHoles;
 
     public:
+        // Constructor to create from C++ data
         explicit GeoPolygonContainer(
             std::vector<LatLng> && mainLoop,
             std::vector<std::vector<LatLng>> && holes = {})
             : mainLoopVerts(std::move(mainLoop)), holeVerts(std::move(holes)) {}
 
+        // Method to get C-style GeoPolygon pointer
         const GeoPolygon * unwrap() const
         {
+            // Prepare main loop
             mutableMainLoop = {
                 static_cast<int>(mainLoopVerts.size()),
                 const_cast<LatLng*>(mainLoopVerts.data())
             };
 
+            // Prepare holes
             mutableHoles.clear();
             mutableHoles.reserve(holeVerts.size());
             for (const auto& hole : holeVerts)
@@ -216,6 +224,7 @@ private:
                 });
             }
 
+            // Prepare full polygon
             mutablePolygon = {
                 mutableMainLoop,
                 static_cast<int>(mutableHoles.size()),
@@ -225,6 +234,7 @@ private:
             return &mutablePolygon;
         }
 
+        // Additional utility methods
         size_t size() const { return mainLoopVerts.size(); }
         bool empty() const { return mainLoopVerts.empty(); }
     };
