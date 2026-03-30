@@ -79,8 +79,17 @@ public:
 
     ColumnPtr executeImpl(const ColumnsWithTypeAndName & arguments, const DataTypePtr &, size_t input_rows_count) const override
     {
-        auto col_array_materialized = arguments[0].column->convertToFullColumnIfConst();
-        const auto * col_array = checkAndGetColumn<ColumnArray>(col_array_materialized.get());
+        const bool is_const_geometry = isColumnConst(*arguments[0].column);
+
+        /// Avoid materializing const geometry to full column — extract the inner data column instead,
+        /// so that `Converter::convert` processes only one row for the const case.
+        ColumnPtr col_array_holder;
+        if (is_const_geometry)
+            col_array_holder = assert_cast<const ColumnConst &>(*arguments[0].column).getDataColumnPtr();
+        else
+            col_array_holder = arguments[0].column;
+
+        const auto * col_array = checkAndGetColumn<ColumnArray>(col_array_holder.get());
         if (!col_array)
             throw Exception(ErrorCodes::ILLEGAL_COLUMN,
                 "Illegal column type {} of argument 1 of function {}. Must be Array",
@@ -100,9 +109,6 @@ public:
         auto & dst_offsets = dst->getOffsets();
         dst_offsets.resize(input_rows_count);
 
-        if (input_rows_count == 0)
-            return dst;
-
         auto current_offset = 0;
 
         callOnGeometryDataType<SphericalPoint>(arguments[0].type, [&] (const auto & type)
@@ -115,6 +121,9 @@ public:
                 throw Exception(ErrorCodes::ILLEGAL_TYPE_OF_ARGUMENT, "The second argument of function {} must not be Point", getName());
             if constexpr (std::is_same_v<ColumnToLineStringsConverter<SphericalPoint>, Converter>)
                 throw Exception(ErrorCodes::ILLEGAL_TYPE_OF_ARGUMENT, "The second argument of function {} must not be LineString", getName());
+
+            if (input_rows_count == 0)
+                return;
 
             // All geometries will be of same kind
             auto geometries = Converter::convert(col_array->getPtr());
@@ -134,7 +143,6 @@ public:
             };
 
             /// When the geometry argument is const, correct and wrap it once and reuse across rows.
-            const bool is_const_geometry = isColumnConst(*arguments[0].column);
             SphericalMultiPolygon const_multi_polygon;
             if (is_const_geometry)
                 const_multi_polygon = to_multi_polygon(std::move(geometries[0]));
