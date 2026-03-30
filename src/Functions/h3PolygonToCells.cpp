@@ -107,6 +107,26 @@ public:
             // All geometries will be of same kind
             auto geometries = Converter::convert(col_array->getPtr());
 
+            auto to_multi_polygon = [](auto && geom) -> SphericalMultiPolygon
+            {
+                boost::geometry::correct(geom);
+
+                if constexpr (std::is_same_v<ColumnToMultiPolygonsConverter<SphericalPoint>, Converter>)
+                    return std::forward<decltype(geom)>(geom);
+                else if constexpr (std::is_same_v<ColumnToPolygonsConverter<SphericalPoint>, Converter>)
+                    return SphericalMultiPolygon({std::forward<decltype(geom)>(geom)});
+                else if constexpr (std::is_same_v<ColumnToRingsConverter<SphericalPoint>, Converter>)
+                    return SphericalMultiPolygon({SphericalPolygon({std::forward<decltype(geom)>(geom)})});
+
+                return {};
+            };
+
+            /// When the geometry argument is const, correct and wrap it once and reuse across rows.
+            const bool is_const_geometry = isColumnConst(*arguments[0].column);
+            SphericalMultiPolygon const_multi_polygon;
+            if (is_const_geometry)
+                const_multi_polygon = to_multi_polygon(std::move(geometries[0]));
+
             /// Reuse buffer across rows to avoid repeated allocations
             std::vector<H3Index> hindex_vec;
 
@@ -120,16 +140,10 @@ public:
                         "The argument 'resolution' ({}) of function {} is out of bounds because the maximum resolution in H3 library is {}",
                         toString(resolution), getName(), toString(MAX_H3_RES));
 
-                auto geometry = std::move(geometries[row]);
-                boost::geometry::correct(geometry);
-
-                SphericalMultiPolygon multi_polygon;
-                if constexpr (std::is_same_v<ColumnToMultiPolygonsConverter<SphericalPoint>, Converter>)
-                    multi_polygon = std::move(geometry);
-                else if constexpr (std::is_same_v<ColumnToPolygonsConverter<SphericalPoint>, Converter>)
-                    multi_polygon = SphericalMultiPolygon({std::move(geometry)});
-                else if constexpr (std::is_same_v<ColumnToRingsConverter<SphericalPoint>, Converter>)
-                    multi_polygon = SphericalMultiPolygon({SphericalPolygon({std::move(geometry)})});
+                SphericalMultiPolygon row_multi_polygon;
+                if (!is_const_geometry)
+                    row_multi_polygon = to_multi_polygon(std::move(geometries[row]));
+                const SphericalMultiPolygon & multi_polygon = is_const_geometry ? const_multi_polygon : row_multi_polygon;
 
                 for (const auto & polygon : multi_polygon)
                 {
