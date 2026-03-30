@@ -91,6 +91,10 @@ public:
         auto & dst_data = dst->getData();
         auto & dst_offsets = dst->getOffsets();
         dst_offsets.resize(input_rows_count);
+
+        if (input_rows_count == 0)
+            return dst;
+
         auto current_offset = 0;
 
         callOnGeometryDataType<SphericalPoint>(arguments[0].type, [&] (const auto & type)
