@@ -111,12 +111,14 @@ public:
     void setNatural(bool value)
     {
         is_natural = value;
+        invalidateTreeHashCache();
     }
 
     /// Mark this join as a USING-style join (used when synthesizing USING from NATURAL JOIN)
     void setUsingJoinExpression()
     {
         is_using_join_expression = true;
+        invalidateTreeHashCache();
     }
 
     /// Get join locality
@@ -129,6 +131,7 @@ public:
     void setLocality(JoinLocality locality_value)
     {
         locality = locality_value;
+        invalidateTreeHashCache();
     }
 
     /// Get join strictness
@@ -147,6 +150,7 @@ public:
     void setKind(JoinKind kind_value)
     {
         kind = kind_value;
+        invalidateTreeHashCache();
     }
 
     /// Convert join node to ASTTableJoin

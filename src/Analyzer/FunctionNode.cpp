@@ -96,6 +96,7 @@ void FunctionNode::resolveAsFunction(FunctionBasePtr function_value)
     function = std::move(function_value);
     kind = FunctionKind::ORDINARY;
     nulls_action = NullsAction::EMPTY;
+    invalidateTreeHashCache();
 }
 
 void FunctionNode::resolveAsAggregateFunction(AggregateFunctionPtr aggregate_function_value)
@@ -109,6 +110,7 @@ void FunctionNode::resolveAsAggregateFunction(AggregateFunctionPtr aggregate_fun
       * Keeping the nulls action may lead to incorrect comparison of functions, e.g., count() and count() IGNORE NULLS are the same function.
       */
     nulls_action = NullsAction::EMPTY;
+    invalidateTreeHashCache();
 }
 
 void FunctionNode::resolveAsWindowFunction(AggregateFunctionPtr window_function_value)
@@ -118,6 +120,7 @@ void FunctionNode::resolveAsWindowFunction(AggregateFunctionPtr window_function_
             "Trying to resolve FunctionNode without window definition as a window function {}", window_function_value->getName());
     resolveAsAggregateFunction(window_function_value);
     kind = FunctionKind::WINDOW;
+    invalidateTreeHashCache();
 }
 
 void FunctionNode::dumpTreeImpl(WriteBuffer & buffer, FormatState & format_state, size_t indent) const

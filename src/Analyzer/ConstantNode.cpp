@@ -117,6 +117,7 @@ void ConstantNode::dumpTreeImpl(WriteBuffer & buffer, FormatState & format_state
 void ConstantNode::convertToNullable()
 {
     constant_value = { makeNullableSafe(constant_value.getColumn()), makeNullableSafe(constant_value.getType()) };
+    invalidateTreeHashCache();
 }
 
 bool ConstantNode::isEqualImpl(const IQueryTreeNode & rhs, CompareOptions compare_options) const

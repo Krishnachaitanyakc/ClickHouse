@@ -74,6 +74,7 @@ void QueryNode::resolveProjectionColumns(NamesAndTypes projection_columns_value)
             projection_columns_value[i].name = this->projection_aliases_to_override[i];
     }
     projection_columns = std::move(projection_columns_value);
+    invalidateTreeHashCache();
 }
 
 void QueryNode::removeUnusedProjectionColumns(const std::unordered_set<size_t> & used_projection_columns_indexes)
@@ -111,6 +112,8 @@ void QueryNode::removeUnusedProjectionColumns(const std::unordered_set<size_t> &
         if (interpolate_list_nodes.empty())
             interpolate_node = nullptr;
     }
+
+    invalidateTreeHashCache();
 }
 
 ColumnNodePtrWithHashSet QueryNode::getCorrelatedColumnsSet() const
@@ -136,6 +139,10 @@ void QueryNode::addCorrelatedColumn(const QueryTreeNodePtr & correlated_column)
             return;
     }
     correlated_columns.push_back(correlated_column);
+    /// Correlated columns live under the correlated-columns child list which
+    /// participates in `children` and is therefore folded into the subtree
+    /// hash. Invalidate the cached value on this node.
+    invalidateTreeHashCache();
 }
 
 DataTypePtr QueryNode::getResultType() const

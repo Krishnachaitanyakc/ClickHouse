@@ -167,6 +167,11 @@ void UnionNode::removeUnusedProjectionColumns(const std::unordered_set<size_t> &
         else if (auto * union_node_typed = query_node->as<UnionNode>())
             union_node_typed->removeUnusedProjectionColumns(used_projection_columns_indexes);
     }
+
+    /// The child queries' projections feed `updateTreeHashImpl` transitively
+    /// via their hashed projection lists; clear the cached subtree hash on
+    /// this union since one or more descendant subtrees just changed.
+    invalidateTreeHashCacheRecursive();
 }
 
 void UnionNode::addCorrelatedColumn(const QueryTreeNodePtr & correlated_column)
@@ -178,6 +183,10 @@ void UnionNode::addCorrelatedColumn(const QueryTreeNodePtr & correlated_column)
             return;
     }
     correlated_columns.push_back(correlated_column);
+    /// Correlated columns are stored under the correlated-columns child list,
+    /// which participates in `children` and is therefore folded into the
+    /// subtree hash. Invalidate the cached value.
+    invalidateTreeHashCache();
 }
 
 void UnionNode::dumpTreeImpl(WriteBuffer & buffer, FormatState & format_state, size_t indent) const

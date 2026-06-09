@@ -104,6 +104,7 @@ public:
     void clearSettingsChanges()
     {
         settings_changes.clear();
+        invalidateTreeHashCache();
     }
 
     /// Returns true if query node is subquery, false otherwise
@@ -116,6 +117,7 @@ public:
     void setIsSubquery(bool is_subquery_value)
     {
         is_subquery = is_subquery_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true if query node is CTE, false otherwise
@@ -128,6 +130,7 @@ public:
     void setIsCTE(bool is_cte_value)
     {
         is_cte = is_cte_value;
+        invalidateTreeHashCache();
     }
 
     /// Get query node CTE name
@@ -140,6 +143,7 @@ public:
     void setCTEName(std::string cte_name_value)
     {
         cte_name = std::move(cte_name_value);
+        invalidateTreeHashCache();
     }
 
     /// Returns true if query node is a MATERIALIZED CTE, false otherwise
@@ -152,6 +156,7 @@ public:
     void setIsMaterialized(bool is_materialized_value) noexcept
     {
         is_materialized = is_materialized_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true if query node has RECURSIVE WITH, false otherwise
@@ -164,6 +169,7 @@ public:
     void setIsRecursiveWith(bool is_recursive_with_value)
     {
         is_recursive_with = is_recursive_with_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true if query node has DISTINCT, false otherwise
@@ -176,6 +182,7 @@ public:
     void setIsDistinct(bool is_distinct_value)
     {
         is_distinct = is_distinct_value;
+        invalidateTreeHashCache();
     }
 
     bool isLimitByAll() const
@@ -186,6 +193,7 @@ public:
     void setIsLimitByAll(bool is_limit_by_all_value)
     {
         is_limit_by_all = is_limit_by_all_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true if query node has LIMIT WITH TIES, false otherwise
@@ -198,6 +206,7 @@ public:
     void setIsLimitWithTies(bool is_limit_with_ties_value)
     {
         is_limit_with_ties = is_limit_with_ties_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true, if query node has GROUP BY WITH TOTALS, false otherwise
@@ -210,6 +219,7 @@ public:
     void setIsGroupByWithTotals(bool is_group_by_with_totals_value)
     {
         is_group_by_with_totals = is_group_by_with_totals_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true, if query node has GROUP BY with ROLLUP modifier, false otherwise
@@ -222,6 +232,7 @@ public:
     void setIsGroupByWithRollup(bool is_group_by_with_rollup_value)
     {
         is_group_by_with_rollup = is_group_by_with_rollup_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true, if query node has GROUP BY with CUBE modifier, false otherwise
@@ -234,6 +245,7 @@ public:
     void setIsGroupByWithCube(bool is_group_by_with_cube_value)
     {
         is_group_by_with_cube = is_group_by_with_cube_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true, if query node has GROUP BY with GROUPING SETS modifier, false otherwise
@@ -246,6 +258,7 @@ public:
     void setIsGroupByWithGroupingSets(bool is_group_by_with_grouping_sets_value)
     {
         is_group_by_with_grouping_sets = is_group_by_with_grouping_sets_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true, if query node has GROUP BY ALL modifier, false otherwise
@@ -258,6 +271,7 @@ public:
     void setIsGroupByAll(bool is_group_by_all_value)
     {
         is_group_by_all = is_group_by_all_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true, if query node has ORDER BY ALL modifier, false otherwise
@@ -270,6 +284,7 @@ public:
     void setIsOrderByAll(bool is_order_by_all_value)
     {
         is_order_by_all = is_order_by_all_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true if query node WITH section is not empty, false otherwise
@@ -639,6 +654,7 @@ public:
     void clearProjectionColumns()
     {
         projection_columns.clear();
+        invalidateTreeHashCache();
     }
 
     /// Remove unused projection columns
@@ -682,6 +698,7 @@ public:
     void setProjectionAliasesToOverride(Names pr_aliases)
     {
         projection_aliases_to_override = std::move(pr_aliases);
+        invalidateTreeHashCache();
     }
 
 protected:

@@ -63,6 +63,7 @@ public:
     void setColumnType(DataTypePtr column_type)
     {
         column.type = std::move(column_type);
+        invalidateTreeHashCache();
     }
 
     /// Returns true if column node has expression, false otherwise
@@ -96,6 +97,7 @@ public:
     void setExpression(QueryTreeNodePtr expression_value)
     {
         children[expression_child_index] = std::move(expression_value);
+        invalidateTreeHashCache();
     }
 
     /** Get column source.
@@ -111,6 +113,7 @@ public:
     void setColumnSource(const QueryTreeNodePtr & source)
     {
         getSourceWeakPointer() = source;
+        invalidateTreeHashCache();
     }
 
     QueryTreeNodeType getNodeType() const override
@@ -126,6 +129,7 @@ public:
     void convertToNullable() override
     {
         column.type = makeNullableOrLowCardinalityNullableSafe(column.type);
+        invalidateTreeHashCache();
     }
 
     void dumpTreeImpl(WriteBuffer & buffer, FormatState & state, size_t indent) const override;

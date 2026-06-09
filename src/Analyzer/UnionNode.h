@@ -71,6 +71,7 @@ public:
     void setIsSubquery(bool is_subquery_value)
     {
         is_subquery = is_subquery_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true if union node is CTE, false otherwise
@@ -83,6 +84,7 @@ public:
     void setIsCTE(bool is_cte_value)
     {
         is_cte = is_cte_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true if union node is a MATERIALIZED CTE, false otherwise
@@ -95,6 +97,7 @@ public:
     void setIsMaterialized(bool is_materialized_value) noexcept
     {
         is_materialized = is_materialized_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true if union node CTE is specified in WITH RECURSIVE, false otherwise
@@ -107,6 +110,7 @@ public:
     void setIsRecursiveCTE(bool is_recursive_cte_value)
     {
         is_recursive_cte = is_recursive_cte_value;
+        invalidateTreeHashCache();
     }
 
     /// Returns true if union node has recursive CTE table, false otherwise
@@ -121,7 +125,12 @@ public:
         return recursive_cte_table;
     }
 
-    /// Returns optional recursive CTE table
+    /// Returns optional recursive CTE table (mutable).
+    /// WARNING: the `storage_id` of `recursive_cte_table` participates in
+    /// `updateTreeHashImpl`. Callers that mutate it MUST follow up with
+    /// `invalidateTreeHashCache()` on this node (or
+    /// `invalidateTreeHashCacheRecursive()` on an ancestor if its cache was
+    /// already populated). See `getTreeHash` for the full contract.
     std::optional<RecursiveCTETable> & getRecursiveCTETable()
     {
         return recursive_cte_table;
@@ -131,6 +140,10 @@ public:
     void setRecursiveCTETable(RecursiveCTETable recursive_cte_table_value)
     {
         recursive_cte_table.emplace(std::move(recursive_cte_table_value));
+        /// `recursive_cte_table` participates in `updateTreeHashImpl` (the
+        /// presence branch mixes in its `storage_id`); invalidate the cached
+        /// subtree hash on this node.
+        invalidateTreeHashCache();
     }
 
     /// Get union node CTE name
@@ -143,6 +156,7 @@ public:
     void setCTEName(std::string cte_name_value)
     {
         cte_name = std::move(cte_name_value);
+        invalidateTreeHashCache();
     }
 
     /// Get union mode

@@ -41,7 +41,14 @@ public:
         return window_frame;
     }
 
-    /// Get window node window frame
+    /// Get window node window frame (mutable).
+    /// WARNING: every hashed field of `window_frame` (`begin_type`,
+    /// `begin_preceding`, `end_type`, `end_preceding`, `is_default`, `type`,
+    /// `begin_offset`, `end_offset`) participates in `updateTreeHashImpl`.
+    /// Callers that mutate any of these MUST follow up with
+    /// `invalidateTreeHashCache()` on this node (or
+    /// `invalidateTreeHashCacheRecursive()` on an ancestor if its cache was
+    /// already populated). See `getTreeHash` for the full contract.
     WindowFrame & getWindowFrame()
     {
         return window_frame;
@@ -63,6 +70,9 @@ public:
     void setParentWindowName(String parent_window_name_value)
     {
         parent_window_name = std::move(parent_window_name_value);
+        /// `parent_window_name` is hashed in `updateTreeHashImpl`; invalidate
+        /// the cached subtree hash on this node.
+        invalidateTreeHashCache();
     }
 
     /// Returns true if window node has order by, false otherwise

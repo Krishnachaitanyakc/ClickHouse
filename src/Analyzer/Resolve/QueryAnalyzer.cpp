@@ -2765,6 +2765,10 @@ ProjectionName QueryAnalyzer::resolveWindow(QueryTreeNodePtr & node, IdentifierR
                 scope.scope_node->formatASTForErrorMessage());
 
         window_node.getWindowFrame().begin_offset = window_frame_begin_constant_node->getValue();
+        /// `begin_offset` participates in `WindowNode::updateTreeHashImpl`;
+        /// invalidate the cached subtree hash since the non-const
+        /// `getWindowFrame()` accessor bypasses any mutator instrumentation.
+        window_node.invalidateTreeHashCache();
         if (frame_begin_offset_projection_names.size() != 1)
             throw Exception(ErrorCodes::LOGICAL_ERROR,
                 "Window FRAME begin offset expected 1 projection name. Actual: {}",
@@ -2786,6 +2790,10 @@ ProjectionName QueryAnalyzer::resolveWindow(QueryTreeNodePtr & node, IdentifierR
                 scope.scope_node->formatASTForErrorMessage());
 
         window_node.getWindowFrame().end_offset = window_frame_end_constant_node->getValue();
+        /// `end_offset` participates in `WindowNode::updateTreeHashImpl`;
+        /// invalidate the cached subtree hash since the non-const
+        /// `getWindowFrame()` accessor bypasses any mutator instrumentation.
+        window_node.invalidateTreeHashCache();
         if (frame_end_offset_projection_names.size() != 1)
             throw Exception(ErrorCodes::LOGICAL_ERROR,
                 "Window FRAME begin offset expected 1 projection name. Actual: {}",

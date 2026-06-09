@@ -37,6 +37,10 @@ void TableFunctionNode::resolve(TableFunctionPtr table_function_value, StoragePt
     storage_id = storage->getStorageID();
     storage_snapshot = storage->getStorageSnapshot(storage->getInMemoryMetadataPtr(context, false), context);
     unresolved_arguments_indexes = std::move(unresolved_arguments_indexes_);
+    /// Going from "not resolved" (storage == nullptr) to "resolved" switches
+    /// which branch of `updateTreeHashImpl` runs (the resolved branch mixes in
+    /// the storage id). Any cached hash from before resolution would be stale.
+    invalidateTreeHashCache();
 }
 
 const StorageID & TableFunctionNode::getStorageID() const

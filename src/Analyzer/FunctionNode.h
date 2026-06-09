@@ -64,7 +64,11 @@ public:
 
     /// Get NullAction modifier
     NullsAction getNullsAction() const { return nulls_action; }
-    void setNullsAction(NullsAction action) { nulls_action = action; }
+    void setNullsAction(NullsAction action)
+    {
+        nulls_action = action;
+        invalidateTreeHashCache();
+    }
 
     void markAsOperator(bool val = true) { this->is_operator = val; }
 
@@ -200,7 +204,10 @@ public:
         /// We might try to convert aggregate/window function for invalid query
         /// before the validation happened.
         if (kind == FunctionKind::ORDINARY)
+        {
             wrap_with_nullable = true;
+            invalidateTreeHashCache();
+        }
     }
 
     void dumpTreeImpl(WriteBuffer & buffer, FormatState & format_state, size_t indent) const override;

@@ -98,6 +98,8 @@ void TableNode::finalizeMaterializedCTE(TemporaryTableHolder temporary_table_hol
     materialized_cte->storage = real_storage;
     materialized_cte->table_holder = std::move(temporary_table_holder_);
     typeid_cast<StorageMemory *>(real_storage.get())->setMaterializedCTE(materialized_cte);
+    /// `updateStorage` calls `invalidateTreeHashCache`, so the cache on this
+    /// node is cleared transitively. No explicit invalidation needed here.
     updateStorage(std::move(real_storage), context_);
 }
 
@@ -107,6 +109,12 @@ void TableNode::updateStorage(StoragePtr storage_value, const ContextPtr & conte
     storage_id = storage->getStorageID();
     storage_lock = storage->lockForShare(context->getInitialQueryId(), context->getSettingsRef()[Setting::lock_acquire_timeout]);
     storage_snapshot = storage->getStorageSnapshot(storage->getInMemoryMetadataPtr(context, false), context);
+    /// `storage_id` (via `getFullNameNotQuoted`) feeds `updateTreeHashImpl`, and
+    /// whether `storage` is set switches which branch of `updateTreeHashImpl`
+    /// runs. Both `RecursiveCTESource::source` and the function-resolution
+    /// view-replacement path can call this while ancestor hashes are already
+    /// cached, so the cache on this node must be cleared.
+    invalidateTreeHashCache();
 }
 
 void TableNode::dumpTreeImpl(WriteBuffer & buffer, FormatState & format_state, size_t indent) const

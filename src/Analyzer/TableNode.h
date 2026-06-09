@@ -96,6 +96,10 @@ public:
     void setTemporaryTableName(std::string temporary_table_name_value)
     {
         temporary_table_name = std::move(temporary_table_name_value);
+        /// `temporary_table_name` is hashed in `updateTreeHashImpl` (it selects
+        /// the temporary-name branch); invalidate the cached subtree hash on
+        /// this node.
+        invalidateTreeHashCache();
     }
 
     /// Return true if table node has table expression modifiers, false otherwise
@@ -110,7 +114,12 @@ public:
         return table_expression_modifiers;
     }
 
-    /// Get table expression modifiers
+    /// Get table expression modifiers (mutable).
+    /// WARNING: every hashed field of `table_expression_modifiers` participates
+    /// in `updateTreeHashImpl`. Callers that mutate any of these MUST follow up
+    /// with `invalidateTreeHashCache()` on this node (or
+    /// `invalidateTreeHashCacheRecursive()` on an ancestor if its cache was
+    /// already populated). See `getTreeHash` for the full contract.
     std::optional<TableExpressionModifiers> & getTableExpressionModifiers()
     {
         return table_expression_modifiers;
@@ -120,6 +129,12 @@ public:
     void setTableExpressionModifiers(TableExpressionModifiers table_expression_modifiers_value)
     {
         table_expression_modifiers = std::move(table_expression_modifiers_value);
+        /// `table_expression_modifiers` is hashed in `updateTreeHashImpl`;
+        /// invalidate the cached subtree hash on this node. Ancestor caches
+        /// (e.g. when `AutoFinalOnQueryPass` flips this on a leaf table inside
+        /// an already-hashed query) are the caller's responsibility per the
+        /// contract documented on `getTreeHash`.
+        invalidateTreeHashCache();
     }
 
     const MaterializedCTEPtr & getMaterializedCTE() const

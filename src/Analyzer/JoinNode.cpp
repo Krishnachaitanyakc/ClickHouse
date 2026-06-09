@@ -220,6 +220,12 @@ void JoinNode::crossToInner(const QueryTreeNodePtr & join_expression_)
     kind = JoinKind::Inner;
     strictness = JoinStrictness::All;
     children[join_expression_child_index] = join_expression_;
+    /// All three of `kind`, `strictness`, and the join-expression child participate
+    /// in `updateTreeHashImpl`, so the cached subtree hash on this node is now
+    /// stale. Callers that mutate the join inside a tree whose ancestor hash was
+    /// already cached must invalidate the ancestor via
+    /// `invalidateTreeHashCacheRecursive`.
+    invalidateTreeHashCache();
 }
 
 
@@ -244,6 +250,9 @@ void CrossJoinNode::appendTable(QueryTreeNodePtr table_expression, CrossJoinNode
 {
     children.push_back(std::move(table_expression));
     join_types.push_back(join_type);
+    /// `join_types` participates in `updateTreeHashImpl` and the new child shifts
+    /// the hashed `children.size()`; invalidate the cached subtree hash.
+    invalidateTreeHashCache();
 }
 
 void CrossJoinNode::dumpTreeImpl(WriteBuffer & buffer, FormatState & format_state, size_t indent) const

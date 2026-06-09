@@ -126,7 +126,12 @@ public:
         return table_expression_modifiers;
     }
 
-    /// Get table expression modifiers
+    /// Get table expression modifiers (mutable).
+    /// WARNING: every hashed field of `table_expression_modifiers` participates
+    /// in `updateTreeHashImpl`. Callers that mutate any of these MUST follow up
+    /// with `invalidateTreeHashCache()` on this node (or
+    /// `invalidateTreeHashCacheRecursive()` on an ancestor if its cache was
+    /// already populated). See `getTreeHash` for the full contract.
     std::optional<TableExpressionModifiers> & getTableExpressionModifiers()
     {
         return table_expression_modifiers;
@@ -142,12 +147,21 @@ public:
     void setSettingsChanges(SettingsChanges settings_changes_)
     {
         settings_changes = std::move(settings_changes_);
+        /// `settings_changes` is hashed in `updateTreeHashImpl`; invalidate the
+        /// cached subtree hash on this node.
+        invalidateTreeHashCache();
     }
 
     /// Set table expression modifiers
     void setTableExpressionModifiers(TableExpressionModifiers table_expression_modifiers_value)
     {
         table_expression_modifiers = std::move(table_expression_modifiers_value);
+        /// `table_expression_modifiers` is hashed in `updateTreeHashImpl`;
+        /// invalidate the cached subtree hash on this node. Ancestor caches
+        /// (e.g. when `AutoFinalOnQueryPass` flips this on a leaf table function
+        /// inside an already-hashed query) are the caller's responsibility per
+        /// the contract documented on `getTreeHash`.
+        invalidateTreeHashCache();
     }
 
     QueryTreeNodeType getNodeType() const override

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <vector>
 #include <deque>
 
@@ -135,8 +136,81 @@ public:
       *
       * Alias of query tree node is part of query tree hash.
       * Original AST is not part of query tree hash.
+      *
+      * Memoization
+      * -----------
+      * When `compare_options` equals the default value
+      * `{compare_aliases=true, compare_types=true, ignore_cte=false}` the computed
+      * subtree hash is cached on this node. Subsequent calls with default options
+      * return the cached value in O(1). The walker also consumes cached hashes
+      * from descendants instead of re-walking their subtrees, so the FIRST call
+      * at any subtree root takes O(uncached descendants) work; for a tree analyzed
+      * bottom-up this collapses the total work across N calls from O(N^2) to O(N).
+      *
+      * Calls with non-default `compare_options` bypass the cache (both read and
+      * write) and always perform a full traversal — these are rare enough that
+      * the extra work is acceptable and the alternative (a per-option cache) is
+      * far more complex.
+      *
+      * Cache invalidation contract
+      * ---------------------------
+      * Mutators that change state participating in the hash MUST invalidate the
+      * cache on the mutated node via `invalidateTreeHashCache`. Because nodes do
+      * not carry a parent pointer, the invalidation cannot walk up to ancestors;
+      * callers that mutate deep inside a tree and intend to re-query an ancestor
+      * hash must call `invalidateTreeHashCacheRecursive` on that ancestor.
+      *
+      * Thread safety
+      * -------------
+      * The cache is NOT thread-safe. A first call from one thread writes
+      * `cached_default_hash`; a concurrent call on the same node from another
+      * thread is a data race under the C++ memory model and TSan will report it.
+      * Callers that may operate on a node shared across threads MUST use
+      * `getTreeHashUncached` instead — that overload never reads or writes the
+      * cache and is safe for concurrent calls on a `const` node.
+      *
+      * In Debug and sanitizer builds (Address/Thread/Memory/UB sanitizer), every
+      * cached return additionally recomputes the hash from scratch and asserts
+      * the values match. This catches missed mutator invalidations in the same
+      * CI configurations that already pay the slower-build cost. The check is
+      * disabled in release builds without sanitizers because it would otherwise
+      * defeat the O(1) cache lookup.
       */
     Hash getTreeHash(CompareOptions compare_options = { .compare_aliases = true, .compare_types = true, .ignore_cte = false }) const;
+
+    /** Identical to `getTreeHash` but never reads or writes the cache.
+      *
+      * Use this overload from any code path that may run concurrently on a node
+      * shared across threads (e.g. `ConcurrentHashJoin`). The cached fast path
+      * mutates `cached_default_hash` lazily and is not synchronised; calling
+      * `getTreeHash` from multiple threads on the same `const` node is a data
+      * race. This overload computes the hash in O(subtree size) every call and
+      * is safe for `const`-correct concurrent access.
+      */
+    Hash getTreeHashUncached(CompareOptions compare_options = { .compare_aliases = true, .compare_types = true, .ignore_cte = false }) const;
+
+    /** Invalidate the cached tree hash on this node only.
+      * Must be called by every mutator that changes state participating in the hash.
+      */
+    void invalidateTreeHashCache() const noexcept
+    {
+        cached_default_hash.reset();
+    }
+
+    /** Invalidate the cached tree hash on this node and on every descendant
+      * reachable through `children`. Use when a deep mutation may have invalidated
+      * caches that an ancestor's cached hash transitively embeds.
+      */
+    void invalidateTreeHashCacheRecursive() const noexcept;
+
+    /// Test-only: returns true if the default-options hash is currently cached
+    /// on this node. Exists for unit tests that verify the memoization contract
+    /// (cache populated on first call, cleared by mutators, never populated for
+    /// non-default options). Production code must not depend on this.
+    bool isTreeHashCachedForTest() const noexcept
+    {
+        return cached_default_hash.has_value();
+    }
 
     /// Get a deep copy of the query tree
     QueryTreeNodePtr clone() const;
@@ -177,12 +251,14 @@ public:
             original_alias = std::move(alias);
 
         alias = std::move(alias_value);
+        invalidateTreeHashCache();
     }
 
     /// Remove node alias
     void removeAlias()
     {
         alias = {};
+        invalidateTreeHashCache();
     }
 
     /// Returns true if the expression was parenthesized in the original query
@@ -312,6 +388,22 @@ private:
     ASTPtr original_ast;
     /// If the expression has extra parentheses around it in the original query
     bool parenthesized = false;
+
+    /** Cached subtree hash computed with the default `CompareOptions`.
+      * Populated lazily on the first call to `getTreeHash` with default options
+      * and cleared by `invalidateTreeHashCache`. See the comment on `getTreeHash`
+      * for the full memoization and invalidation contract.
+      */
+    mutable std::optional<Hash> cached_default_hash;
+
+    /// Implementation helper used by `getTreeHash`. Walks the subtree rooted at
+    /// `root`; if `use_cache` is true, descendants with a populated
+    /// `cached_default_hash` short-circuit and contribute their cached value
+    /// instead of being re-walked.
+    static Hash computeTreeHash(
+        const IQueryTreeNode & root,
+        CompareOptions compare_options,
+        bool use_cache);
 };
 
 }
